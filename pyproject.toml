@@ -15,6 +15,11 @@ dependencies = [
     "pillow>=10.0.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
 [project.scripts]
 gh-space-shooter = "gh_space_shooter.cli:app"
 
@@ -48,3 +53,7 @@ commit_args = ""
 filename = "pyproject.toml"
 search = "version = \"{current_version}\""
 replace = "version = \"{new_version}\""
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

@@ -46,8 +46,6 @@ Then display it in your README:
 - `strategy` (optional): Attack pattern - `column`, `row`, or `random` (default: `random`)
 - `commit-message` (optional): Commit message for the update
 
-See [ACTION.md](ACTION.md) for more examples and detailed documentation.
-
 ### From PyPI
 
 ```bash
@@ -149,8 +147,7 @@ When saved to JSON, the data includes:
         }
       ]
     }
-  ],
-  "fetched_at": "2024-12-30T12:00:00"
+  ]
 }
 ```
 

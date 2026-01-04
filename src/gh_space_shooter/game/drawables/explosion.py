@@ -6,6 +6,14 @@ from typing import TYPE_CHECKING, Literal
 
 from PIL import ImageDraw
 
+from ...constants import (
+    EXPLOSION_MAX_FRAMES_LARGE,
+    EXPLOSION_MAX_FRAMES_SMALL,
+    EXPLOSION_MAX_RADIUS_LARGE,
+    EXPLOSION_MAX_RADIUS_SMALL,
+    EXPLOSION_PARTICLE_COUNT_LARGE,
+    EXPLOSION_PARTICLE_COUNT_SMALL,
+)
 from .drawable import Drawable
 
 if TYPE_CHECKING:
@@ -30,10 +38,9 @@ class Explosion(Drawable):
         self.y = y
         self.game_state = game_state
         self.frame = 0
-        self.max_frames = 6 if size == "small" else 20
-        self.max_radius = 10 if size == "small" else 20
-        self.particle_count = 4 if size == "small" else 8
-        # Generate random angles for each particle
+        self.max_frames = EXPLOSION_MAX_FRAMES_SMALL if size == "small" else EXPLOSION_MAX_FRAMES_LARGE
+        self.max_radius = EXPLOSION_MAX_RADIUS_SMALL if size == "small" else EXPLOSION_MAX_RADIUS_LARGE
+        self.particle_count = EXPLOSION_PARTICLE_COUNT_SMALL if size == "small" else EXPLOSION_PARTICLE_COUNT_LARGE
         self.particle_angles = [random.uniform(0, 2 * math.pi) for _ in range(self.particle_count)]
 
     def animate(self) -> None:
@@ -44,21 +51,18 @@ class Explosion(Drawable):
 
     def draw(self, draw: ImageDraw.ImageDraw, context: "RenderContext") -> None:
         """Draw expanding particle explosion with fade effect."""
-        # Calculate animation progress (0 to 1)
+
         progress = self.frame / self.max_frames
         fade = 1 - progress  # Fade out as animation progresses
 
-        # Get center position
         center_x, center_y = context.get_cell_position(self.x, self.y)
         center_x += context.cell_size // 2
         center_y += context.cell_size // 2
 
-        # Draw expanding particles in random directions
         for i in range(self.particle_count):
             distance = progress * self.max_radius
             angle = self.particle_angles[i]
 
-            # Particle position using random angle
             px = int(center_x + distance * math.cos(angle))
             py = int(center_y + distance * math.sin(angle))
 

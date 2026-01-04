@@ -17,3 +17,6 @@ wheels/
 # Environment variables (secrets)
 .env
 .env.*
+
+# Test output
+my-contributions.json

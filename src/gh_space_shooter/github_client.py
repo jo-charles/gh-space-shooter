@@ -32,7 +32,6 @@ class ContributionData(TypedDict):
     username: str
     total_contributions: int
     weeks: list[ContributionWeek]
-    fetched_at: str
 
 
 class GitHubAPIError(Exception):
@@ -157,7 +156,6 @@ class GitHubClient:
             "username": username,
             "total_contributions": calendar["totalContributions"],
             "weeks": weeks,
-            "fetched_at": datetime.now().isoformat(),
         }
 
     LEVEL_MAP = {

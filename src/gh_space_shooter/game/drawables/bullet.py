@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from PIL import ImageDraw
 
-from ...constants import BULLET_SPEED, SHIP_POSITION_Y
+from ...constants import BULLET_SPEED, BULLET_TRAILING_LENGTH, SHIP_POSITION_Y
 from .drawable import Drawable
 from .explosion import Explosion
 
@@ -52,10 +52,9 @@ class Bullet(Drawable):
     def draw(self, draw: ImageDraw.ImageDraw, context: "RenderContext") -> None:
         """Draw the bullet with trailing tail effect."""
 
-        trail_num = 3
-        for i in range(trail_num):
+        for i in range(BULLET_TRAILING_LENGTH):
             trail_y = self.y + (i + 1) * BULLET_SPEED
-            fade_factor = (i + 1) / trail_num / 2
+            fade_factor = (i + 1) / BULLET_TRAILING_LENGTH / 2
             self._draw_bullet(draw, context, (self.x, trail_y), fade_factor=fade_factor)
 
         self._draw_bullet(draw, context, (self.x, self.y), fade_factor=0.3, offset=.6)
