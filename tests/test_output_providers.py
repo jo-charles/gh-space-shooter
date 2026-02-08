@@ -3,7 +3,7 @@
 import pytest
 from PIL import Image
 from gh_space_shooter.output.base import OutputProvider
-from gh_space_shooter.output import GifOutputProvider
+from gh_space_shooter.output import GifOutputProvider, WebPOutputProvider
 
 
 def test_output_provider_is_abstract():
@@ -47,4 +47,25 @@ def test_gif_provider_empty_frames():
     result = provider.encode(iter([]))
 
     # Empty result for empty frames
+    assert result == b""
+
+
+def test_webp_provider_encodes_frames():
+    """WebPOutputProvider should encode frames to WebP format."""
+    provider = WebPOutputProvider(fps=30)
+    frames = [create_test_frame("red"), create_test_frame("blue")]
+
+    result = provider.encode(iter(frames))
+
+    # WebP files start with RIFF....WEBP
+    assert result.startswith(b"RIFF")
+    assert b"WEBP" in result
+    assert len(result) > 0
+
+
+def test_webp_provider_empty_frames():
+    """WebPOutputProvider should handle empty frame list."""
+    provider = WebPOutputProvider(fps=30)
+    result = provider.encode(iter([]))
+
     assert result == b""
