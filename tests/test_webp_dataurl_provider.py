@@ -29,3 +29,29 @@ def test_provider_creates_new_file():
         assert content.startswith("data:image/webp;base64,")
         # Should return bytes as well
         assert result == content.encode("utf-8")
+
+
+def test_injection_mode_replaces_marker_line():
+    """Provider should replace line containing <!-- space-shooter --> with data URL."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output_path = os.path.join(tmpdir, "output.txt")
+
+        # Create file with marker
+        with open(output_path, "w") as f:
+            f.write("# My Contribution Graph\n")
+            f.write("<!-- space-shooter -->\n")
+            f.write("## Other content\n")
+
+        provider = WebpDataUrlOutputProvider(output_path)
+        frames = [create_test_frame("red")]
+        provider.encode(iter(frames), frame_duration=100)
+
+        # Verify injection worked
+        with open(output_path, "r") as f:
+            content = f.read()
+
+        lines = content.splitlines()
+        assert len(lines) == 3
+        assert lines[0] == "# My Contribution Graph"
+        assert lines[1].startswith("data:image/webp;base64,")
+        assert lines[2] == "## Other content"
