@@ -34,3 +34,14 @@ class GifOutputProvider(OutputProvider):
             )
 
         return buffer.getvalue()
+
+    def write(self, path: str, data: bytes) -> None:
+        """
+        Write GIF-encoded data to a file.
+
+        Args:
+            path: Path to the output file
+            data: GIF-encoded bytes to write
+        """
+        with open(path, "wb") as f:
+            f.write(data)

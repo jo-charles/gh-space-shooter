@@ -36,3 +36,14 @@ class WebPOutputProvider(OutputProvider):
             )
 
         return buffer.getvalue()
+
+    def write(self, path: str, data: bytes) -> None:
+        """
+        Write WebP-encoded data to a file.
+
+        Args:
+            path: Path to the output file
+            data: WebP-encoded bytes to write
+        """
+        with open(path, "wb") as f:
+            f.write(data)

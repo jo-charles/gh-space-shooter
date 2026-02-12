@@ -20,3 +20,14 @@ class OutputProvider(ABC):
             Encoded output as bytes
         """
         pass
+
+    @abstractmethod
+    def write(self, path: str, data: bytes) -> None:
+        """
+        Write encoded data to a file.
+
+        Args:
+            path: Path to the output file
+            data: Encoded data to write
+        """
+        pass

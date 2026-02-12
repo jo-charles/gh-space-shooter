@@ -26,7 +26,7 @@ class WebpDataUrlOutputProvider(OutputProvider):
 
     def encode(self, frames: Iterator[Image.Image], frame_duration: int) -> bytes:
         """
-        Encode frames as a WebP data URL and write to file.
+        Encode frames as a WebP data URL.
 
         Args:
             frames: Iterator of PIL Images
@@ -59,31 +59,29 @@ class WebpDataUrlOutputProvider(OutputProvider):
             base64_data = base64.b64encode(webp_bytes).decode("ascii")
             data_url = f"data:image/webp;base64,{base64_data}"
 
-        # Write to file and get back what was actually written
-        written_content = self._write_to_file(data_url)
+        # Return data URL as bytes
+        return data_url.encode("utf-8")
 
-        # Return what was written as bytes
-        return written_content.encode("utf-8")
-
-    def _write_to_file(self, data_url: str) -> str:
+    def write(self, path: str, data: bytes) -> None:
         """
         Write data URL to file with injection or append mode.
 
-        Args:
-            data_url: The data URL string to write
+        This handles text mode properly with newlines.
 
-        Returns:
-            The content that was written (for return value consistency)
+        Args:
+            path: Path to the output file
+            data: Data URL as bytes (will be decoded as UTF-8 text)
         """
+        data_url = data.decode("utf-8")
+
         # Try to create new file exclusively (avoids TOCTOU race condition)
         try:
-            written = data_url + "\n"
-            with open(self.output_path, "x") as f:
-                f.write(written)
-            return written
+            with open(path, "x") as f:
+                f.write(data_url + "\n")
+            return
         except FileExistsError:
             # File exists - read contents
-            with open(self.output_path, "r") as f:
+            with open(path, "r") as f:
                 content = f.read()
 
         # Check for marker
@@ -102,7 +100,5 @@ class WebpDataUrlOutputProvider(OutputProvider):
             content += data_url + "\n"
 
         # Write back
-        with open(self.output_path, "w") as f:
+        with open(path, "w") as f:
             f.write(content)
-
-        return content

@@ -179,6 +179,31 @@ def _save_data_to_file(data: ContributionData, file_path: str) -> None:
         raise CLIError(f"Failed to save file '{file_path}': {e}")
 
 
+def _setup_strategy(strategy_name: str) -> BaseStrategy:
+    """
+    Resolve and instantiate a strategy by name.
+
+    Args:
+        strategy_name: Name of the strategy (column, row, random)
+
+    Returns:
+        Strategy instance
+
+    Raises:
+        CLIError: If strategy name is unknown
+    """
+    if strategy_name == "column":
+        return ColumnStrategy()
+    elif strategy_name == "row":
+        return RowStrategy()
+    elif strategy_name == "random":
+        return RandomStrategy()
+    else:
+        raise CLIError(
+            f"Unknown strategy '{strategy_name}'. Available: column, row, random"
+        )
+
+
 def _generate_output(
     data: ContributionData,
     file_path: str,
@@ -199,17 +224,8 @@ def _generate_output(
     ext = Path(file_path).suffix[1:].upper()  # Remove dot and uppercase
     console.print(f"\n[bold blue]Generating {ext} animation...[/bold blue]")
 
-    # Resolve strategy
-    if strategy_name == "column":
-        strategy: BaseStrategy = ColumnStrategy()
-    elif strategy_name == "row":
-        strategy = RowStrategy()
-    elif strategy_name == "random":
-        strategy = RandomStrategy()
-    else:
-        raise CLIError(
-            f"Unknown strategy '{strategy_name}'. Available: column, row, random"
-        )
+    # Setup strategy
+    strategy = _setup_strategy(strategy_name)
 
     # Resolve output provider
     try:
@@ -221,12 +237,11 @@ def _generate_output(
     try:
         animator = Animator(data, strategy, fps=fps, watermark=watermark)
         encoded = provider.encode(
-            animator.generate_frames(max_frames), 
+            animator.generate_frames(max_frames),
             frame_duration=1000 // fps)
 
         console.print(f"[bold blue]Saving to {file_path}...[/bold blue]")
-        with open(file_path, "wb") as f:
-            f.write(encoded)
+        provider.write(file_path, encoded)
 
         console.print(f"[green]✓[/green] {ext} saved to {file_path}")
     except Exception as e:
@@ -245,17 +260,8 @@ def _generate_dataurl_output(
 
     console.print(f"\n[bold blue]Generating WebP data URL...[/bold blue]")
 
-    # Resolve strategy
-    if strategy_name == "column":
-        strategy: BaseStrategy = ColumnStrategy()
-    elif strategy_name == "row":
-        strategy = RowStrategy()
-    elif strategy_name == "random":
-        strategy = RandomStrategy()
-    else:
-        raise CLIError(
-            f"Unknown strategy '{strategy_name}'. Available: column, row, random"
-        )
+    # Setup strategy
+    strategy = _setup_strategy(strategy_name)
 
     # Import the data URL provider
     from .output.webp_dataurl_provider import WebpDataUrlOutputProvider
@@ -264,10 +270,11 @@ def _generate_dataurl_output(
     try:
         animator = Animator(data, strategy, fps=fps, watermark=watermark)
         provider = WebpDataUrlOutputProvider(file_path)
-        provider.encode(
+        encoded = provider.encode(
             animator.generate_frames(max_frames),
             frame_duration=1000 // fps
         )
+        provider.write(file_path, encoded)
 
         console.print(f"[green]✓[/green] Data URL written to {file_path}")
     except Exception as e:

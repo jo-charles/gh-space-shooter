@@ -20,15 +20,16 @@ def test_provider_creates_new_file():
         provider = WebpDataUrlOutputProvider(output_path)
         frames = [create_test_frame("red"), create_test_frame("blue")]
 
-        result = provider.encode(iter(frames), frame_duration=100)
+        data = provider.encode(iter(frames), frame_duration=100)
+        provider.write(output_path, data)
 
         # File should exist and contain data URL
         assert os.path.exists(output_path)
         with open(output_path, "r") as f:
             content = f.read()
         assert content.startswith("data:image/webp;base64,")
-        # Should return bytes as well
-        assert result == content.encode("utf-8")
+        # write() adds a newline, so content ends with \n but data doesn't
+        assert content == data.decode("utf-8") + "\n"
 
 
 def test_injection_mode_replaces_marker_line():
@@ -44,7 +45,8 @@ def test_injection_mode_replaces_marker_line():
 
         provider = WebpDataUrlOutputProvider(output_path)
         frames = [create_test_frame("red")]
-        provider.encode(iter(frames), frame_duration=100)
+        data = provider.encode(iter(frames), frame_duration=100)
+        provider.write(output_path, data)
 
         # Verify injection worked
         with open(output_path, "r") as f:
@@ -68,7 +70,8 @@ def test_append_mode_when_no_marker():
 
         provider = WebpDataUrlOutputProvider(output_path)
         frames = [create_test_frame("red")]
-        provider.encode(iter(frames), frame_duration=100)
+        data = provider.encode(iter(frames), frame_duration=100)
+        provider.write(output_path, data)
 
         # Verify append worked
         with open(output_path, "r") as f:
@@ -86,14 +89,17 @@ def test_empty_frames_writes_empty_string():
         output_path = os.path.join(tmpdir, "output.txt")
 
         provider = WebpDataUrlOutputProvider(output_path)
-        result = provider.encode(iter([]), frame_duration=100)
+        data = provider.encode(iter([]), frame_duration=100)
+        provider.write(output_path, data)
 
         # File should exist with empty content
         assert os.path.exists(output_path)
         with open(output_path, "r") as f:
             content = f.read()
-        assert content == "\n"  # Empty URL + newline
-        assert result == b"\n"  # Returns newline as bytes
+        # write() adds a newline to the empty data
+        assert content == "\n"
+        # encode() returns empty bytes
+        assert data == b""
 
 
 def test_multiple_markers_only_first_replaced():
@@ -109,7 +115,8 @@ def test_multiple_markers_only_first_replaced():
 
         provider = WebpDataUrlOutputProvider(output_path)
         frames = [create_test_frame("red")]
-        provider.encode(iter(frames), frame_duration=100)
+        data = provider.encode(iter(frames), frame_duration=100)
+        provider.write(output_path, data)
 
         # Verify only first marker replaced
         with open(output_path, "r") as f:
