@@ -10,12 +10,11 @@ from dotenv import load_dotenv
 from rich.console import Console
 
 from .constants import DEFAULT_FPS
-from .game.strategies.base_strategy import BaseStrategy
 from .console_printer import ContributionConsolePrinter
-from .game import Animator, ColumnStrategy, RandomStrategy, RowStrategy
+from .game import Animator, ColumnStrategy, RandomStrategy, RowStrategy, BaseStrategy
 from .github_client import ContributionData, GitHubAPIError, GitHubClient
 from .output import resolve_output_provider
-from .output.base import OutputProvider
+from .output import OutputProvider, WebpDataUrlOutputProvider
 
 # Load environment variables from .env file
 load_dotenv()
@@ -193,7 +192,6 @@ def _resolve_provider(file_path: str, is_dataurl: bool) -> OutputProvider:
     """
     try:
         if is_dataurl:
-            from .output.webp_dataurl_provider import WebpDataUrlOutputProvider
             return WebpDataUrlOutputProvider(file_path)
         else:
             return resolve_output_provider(file_path)
@@ -201,7 +199,7 @@ def _resolve_provider(file_path: str, is_dataurl: bool) -> OutputProvider:
         raise CLIError(str(e))
 
 
-def _setup_strategy(strategy_name: str, data: ContributionData, fps: int, watermark: bool) -> Animator:
+def _setup_animator(strategy_name: str, data: ContributionData, fps: int, watermark: bool) -> Animator:
     """
     Set up strategy and animator.
 
@@ -218,7 +216,7 @@ def _setup_strategy(strategy_name: str, data: ContributionData, fps: int, waterm
         CLIError: If strategy name is unknown
     """
     if strategy_name == "column":
-        strategy = ColumnStrategy()
+        strategy: BaseStrategy = ColumnStrategy()
     elif strategy_name == "row":
         strategy = RowStrategy()
     elif strategy_name == "random":
@@ -261,15 +259,14 @@ def _generate_output(
         )
 
     # Print generation message
-    from .output.webp_dataurl_provider import WebpDataUrlOutputProvider
     if isinstance(provider, WebpDataUrlOutputProvider):
-        console.print(f"\n[bold blue]Generating WebP data URL...[/bold blue]")
+        console.print("\n[bold blue]Generating WebP data URL...[/bold blue]")
     else:
         ext = Path(provider.path).suffix[1:].upper()
         console.print(f"\n[bold blue]Generating {ext} animation...[/bold blue]")
 
     # Setup strategy and animator
-    animator = _setup_strategy(strategy_name, data, fps, watermark)
+    animator = _setup_animator(strategy_name, data, fps, watermark)
 
     # Encode and write
     try:
