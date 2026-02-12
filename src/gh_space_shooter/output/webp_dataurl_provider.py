@@ -8,8 +8,9 @@ from PIL import Image
 from .base import OutputProvider
 
 
-# Marker to search for in files for injection mode
-_MARKER = "<!-- space-shooter -->"
+# Section markers for injection mode
+_SECTION_START_MARKER = "<!--START_SECTION:space-shooter-->"
+_SECTION_END_MARKER = "<!--END_SECTION:space-shooter-->"
 
 
 class WebpDataUrlOutputProvider(OutputProvider):
@@ -64,12 +65,16 @@ class WebpDataUrlOutputProvider(OutputProvider):
 
     def write(self, data: bytes) -> None:
         """
-        Write data URL to file as an HTML img tag with injection or append mode.
+        Write data URL to file as an HTML img tag with section-based injection.
 
-        This handles text mode properly with newlines.
+        For new files, wraps content in section markers.
+        For existing files, validates and replaces content between markers.
 
         Args:
             data: Data URL as bytes (will be decoded as UTF-8 text)
+
+        Raises:
+            ValueError: If section markers are missing or in wrong order
         """
         data_url = data.decode("utf-8")
         # Wrap in HTML img tag
@@ -78,28 +83,60 @@ class WebpDataUrlOutputProvider(OutputProvider):
         # Try to create new file exclusively (avoids TOCTOU race condition)
         try:
             with open(self.path, "x") as f:
+                # Wrap content in section markers
+                f.write(_SECTION_START_MARKER + "\n")
                 f.write(img_tag + "\n")
+                f.write(_SECTION_END_MARKER + "\n")
             return
         except FileExistsError:
             # File exists - read contents
             with open(self.path, "r") as f:
                 content = f.read()
 
-        # Check for marker
-        if _MARKER in content:
-            # Injection mode: replace the line containing the marker
-            lines = content.splitlines(keepends=True)
-            for i, line in enumerate(lines):
-                if _MARKER in line:
-                    lines[i] = img_tag + "\n"
-                    break
-            content = "".join(lines)
-        else:
-            # Append mode: add to end
-            if content and not content.endswith("\n"):
-                content += "\n"
-            content += img_tag + "\n"
+        # Find start and end markers
+        start_idx = content.find(_SECTION_START_MARKER)
+        end_idx = content.find(_SECTION_END_MARKER)
+
+        # Validate markers exist
+        if start_idx == -1:
+            raise ValueError(
+                f"Start marker '{_SECTION_START_MARKER}' not found in file. "
+                f"Please add both '{_SECTION_START_MARKER}' and '{_SECTION_END_MARKER}' markers to your file."
+            )
+        if end_idx == -1:
+            raise ValueError(
+                f"End marker '{_SECTION_END_MARKER}' not found in file. "
+                f"Please add both '{_SECTION_START_MARKER}' and '{_SECTION_END_MARKER}' markers to your file."
+            )
+
+        # Validate marker order
+        if start_idx > end_idx:
+            raise ValueError(
+                f"Start marker '{_SECTION_START_MARKER}' must appear before end marker '{_SECTION_END_MARKER}'."
+            )
+
+        # Calculate positions for content replacement
+        # Content after start marker (skip newlines to insert after them)
+        after_start = start_idx + len(_SECTION_START_MARKER)
+        while after_start < len(content) and content[after_start] in "\r\n":
+            after_start += 1
+
+        # Content before end marker (include the newline before the end marker)
+        before_end = end_idx
+        # Include any newlines immediately before the end marker for proper formatting
+        while before_end > after_start and content[before_end - 1] in "\r\n":
+            before_end -= 1
+
+        # Build new content: keep everything up to after_start (incl. newlines),
+        # add img tag with newline if needed, then keep everything from before_end
+        # If before_end == after_start, the section was empty - add a newline
+        img_with_newline = img_tag if before_end > after_start else img_tag + "\n"
+        new_content = (
+            content[:after_start] +
+            img_with_newline +
+            content[before_end:]
+        )
 
         # Write back
         with open(self.path, "w") as f:
-            f.write(content)
+            f.write(new_content)

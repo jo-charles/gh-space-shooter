@@ -130,6 +130,34 @@ This creates an animated GIF showing:
 - Smooth animations with randomized particle effects
 - Your contribution stats displayed in the console
 
+### Generate Data URL (for embedding in HTML/Markdown)
+
+For direct embedding in READMEs or HTML files, use `--write-dataurl-to` to generate a WebP data URL wrapped in an HTML `<img>` tag:
+
+```bash
+# Generate data URL and write to README.md
+gh-space-shooter torvalds --write-dataurl-to README.md
+
+# Short form
+gh-space-shooter torvalds -wdt README.md
+```
+
+**Using section markers:** To use this feature, add section markers to your file where you want the game to appear:
+
+```markdown
+# My Profile
+
+<!--START_SECTION:space-shooter-->
+<!--END_SECTION:space-shooter-->
+
+## About Me
+```
+
+The provider will:
+- **Create new files** with content wrapped in section markers
+- **Replace content** between existing markers (preserving surrounding content)
+- **Raise error** if markers are missing or in wrong order (no silent fallback)
+
 ### Advanced Options
 
 ```bash
@@ -141,6 +169,9 @@ gh-space-shooter --raw-input data.json --output game.webp
 
 # Combine options
 gh-space-shooter torvalds -o game.webp -ro data.json -s column
+
+# Generate data URL with custom strategy
+gh-space-shooter torvalds -wdt README.md -s column
 ```
 
 ### Data Format

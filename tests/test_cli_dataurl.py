@@ -6,6 +6,10 @@ import tempfile
 
 from typer.testing import CliRunner
 from gh_space_shooter.cli import app
+from gh_space_shooter.output.webp_dataurl_provider import (
+    _SECTION_START_MARKER,
+    _SECTION_END_MARKER,
+)
 
 runner = CliRunner()
 
@@ -56,6 +60,10 @@ def test_dataurl_flag_works():
         with open(output_file, "r") as f:
             content = f.read()
 
-        # Output should be an HTML img tag with the data URL
-        assert content.startswith('<img src="data:image/webp;base64,')
-        assert content.endswith('" />\n')
+        # Output should be wrapped in section markers with HTML img tag
+        lines = content.splitlines()
+        assert len(lines) == 3
+        assert lines[0] == _SECTION_START_MARKER
+        assert lines[1].startswith('<img src="data:image/webp;base64,')
+        assert lines[1].endswith('" />')
+        assert lines[2] == _SECTION_END_MARKER
