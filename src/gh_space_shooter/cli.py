@@ -15,6 +15,7 @@ from .console_printer import ContributionConsolePrinter
 from .game import Animator, ColumnStrategy, RandomStrategy, RowStrategy
 from .github_client import ContributionData, GitHubAPIError, GitHubClient
 from .output import resolve_output_provider
+from .output.base import OutputProvider
 
 # Load environment variables from .env file
 load_dotenv()
@@ -101,9 +102,6 @@ def main(
                 "Cannot specify both --output and --write-dataurl-to. Choose one."
             )
 
-        # Set default output path if neither option specified
-        if not out and not write_dataurl_to:
-            out = f"{username}-gh-space-shooter.gif"
         # Load data from file or GitHub
         if raw_input:
             data = _load_data_from_file(raw_input)
@@ -120,10 +118,10 @@ def main(
             _save_data_to_file(data, raw_output)
 
         # Generate output if requested
-        if write_dataurl_to:
-            _generate_output(data, write_dataurl_to, strategy, fps, watermark, max_frames, write_dataurl=True)
-        elif out:
-            _generate_output(data, out, strategy, fps, watermark, max_frames)
+        if write_dataurl_to or out:
+            output_path = write_dataurl_to or out
+            provider = _resolve_provider(output_path, bool(write_dataurl_to))
+            _generate_output(data, provider, strategy, fps, watermark, max_frames)
 
     except CLIError as e:
         err_console.print(f"[bold red]Error:[/bold red] {e}")
@@ -179,6 +177,30 @@ def _save_data_to_file(data: ContributionData, file_path: str) -> None:
         raise CLIError(f"Failed to save file '{file_path}': {e}")
 
 
+def _resolve_provider(file_path: str, is_dataurl: bool) -> OutputProvider:
+    """
+    Resolve the appropriate output provider based on file path and mode.
+
+    Args:
+        file_path: Path to the output file
+        is_dataurl: Whether to generate data URL mode
+
+    Returns:
+        An OutputProvider instance
+
+    Raises:
+        CLIError: If provider resolution fails
+    """
+    try:
+        if is_dataurl:
+            from .output.webp_dataurl_provider import WebpDataUrlOutputProvider
+            return WebpDataUrlOutputProvider(file_path)
+        else:
+            return resolve_output_provider(file_path)
+    except ValueError as e:
+        raise CLIError(str(e))
+
+
 def _setup_strategy(strategy_name: str, data: ContributionData, fps: int, watermark: bool) -> Animator:
     """
     Set up strategy and animator.
@@ -211,52 +233,55 @@ def _setup_strategy(strategy_name: str, data: ContributionData, fps: int, waterm
 
 def _generate_output(
     data: ContributionData,
-    file_path: str,
+    provider: OutputProvider,
     strategy_name: str,
     fps: int,
     watermark: bool,
     max_frames: int | None,
-    write_dataurl: bool = False,
 ) -> None:
-    """Unified output generation for both binary and data URL modes."""
+    """
+    Generate output using the provided provider.
 
+    Args:
+        data: Contribution data from GitHub
+        provider: Output provider (already resolved with path)
+        strategy_name: Name of the strategy (column, row, random)
+        fps: Frames per second
+        watermark: Whether to add watermark
+        max_frames: Maximum number of frames to generate
+
+    Raises:
+        CLIError: If output generation fails
+    """
     # Warn about GIF FPS limitation
-    if file_path.endswith(".gif") and fps > 50:
+    if provider.path.endswith(".gif") and fps > 50:
         console.print(
             f"[yellow]Warning:[/yellow] FPS > 50 may not display correctly in browsers "
             f"(GIF delay will be {1000 // fps}ms, but browsers clamp delays < 20ms to ~100ms)"
         )
 
-    if write_dataurl:
+    # Print generation message
+    from .output.webp_dataurl_provider import WebpDataUrlOutputProvider
+    if isinstance(provider, WebpDataUrlOutputProvider):
         console.print(f"\n[bold blue]Generating WebP data URL...[/bold blue]")
     else:
-        ext = Path(file_path).suffix[1:].upper()  # Remove dot and uppercase
+        ext = Path(provider.path).suffix[1:].upper()
         console.print(f"\n[bold blue]Generating {ext} animation...[/bold blue]")
 
     # Setup strategy and animator
     animator = _setup_strategy(strategy_name, data, fps, watermark)
-
-    # Resolve output provider based on file_path and mode
-    try:
-        if write_dataurl:
-            from .output.webp_dataurl_provider import WebpDataUrlOutputProvider
-            provider = WebpDataUrlOutputProvider(file_path)
-        else:
-            provider = resolve_output_provider(file_path)
-    except ValueError as e:
-        raise CLIError(str(e))
 
     # Encode and write
     try:
         encoded = provider.encode(animator.generate_frames(max_frames), 1000 // fps)
         provider.write(encoded)
 
-        # Console output
-        if write_dataurl:
-            console.print(f"[green]✓[/green] Data URL written to {file_path}")
+        # Console output based on provider type
+        if isinstance(provider, WebpDataUrlOutputProvider):
+            console.print(f"[green]✓[/green] Data URL written to {provider.path}")
         else:
-            ext = Path(file_path).suffix[1:].upper()
-            console.print(f"[green]✓[/green] {ext} saved to {file_path}")
+            ext = Path(provider.path).suffix[1:].upper()
+            console.print(f"[green]✓[/green] {ext} saved to {provider.path}")
     except Exception as e:
         raise CLIError(f"Failed to generate output: {e}")
 
