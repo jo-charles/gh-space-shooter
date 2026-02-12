@@ -38,7 +38,7 @@ def generate_gif(username: str, strategy: str, token: str) -> bytes:
     strat = strategy_class()
 
     animator = Animator(data, strat, fps=25, watermark=True)
-    provider = GifOutputProvider()
+    provider = GifOutputProvider("dummy.gif")
     encoded = provider.encode(animator.generate_frames(max_frames=250), frame_duration=1000 // 25)
     return encoded
 
