@@ -14,7 +14,7 @@ def create_test_frame(color="red"):
 
 def test_gif_provider_encodes_frames():
     """GifOutputProvider should encode frames to GIF format."""
-    provider = GifOutputProvider()
+    provider = GifOutputProvider("test_output.gif")
     frames = [create_test_frame("red"), create_test_frame("blue")]
 
     result = provider.encode(iter(frames), frame_duration=100)
@@ -25,7 +25,7 @@ def test_gif_provider_encodes_frames():
 
 def test_gif_provider_empty_frames():
     """GifOutputProvider should handle empty frame list."""
-    provider = GifOutputProvider()
+    provider = GifOutputProvider("test_output.gif")
     result = provider.encode(iter([]), frame_duration=100)
 
     # Empty result for empty frames
@@ -34,7 +34,7 @@ def test_gif_provider_empty_frames():
 
 def test_webp_provider_encodes_frames():
     """WebPOutputProvider should encode frames to WebP format."""
-    provider = WebPOutputProvider()
+    provider = WebPOutputProvider("test_output.webp")
     frames = [create_test_frame("red"), create_test_frame("blue")]
 
     result = provider.encode(iter(frames), frame_duration=100)
@@ -47,7 +47,7 @@ def test_webp_provider_encodes_frames():
 
 def test_webp_provider_empty_frames():
     """WebPOutputProvider should handle empty frame list."""
-    provider = WebPOutputProvider()
+    provider = WebPOutputProvider("test_output.webp")
     result = provider.encode(iter([]), frame_duration=100)
 
     assert result == b""

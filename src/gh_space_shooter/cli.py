@@ -10,11 +10,11 @@ from dotenv import load_dotenv
 from rich.console import Console
 
 from .constants import DEFAULT_FPS
-from .game.strategies.base_strategy import BaseStrategy
 from .console_printer import ContributionConsolePrinter
-from .game import Animator, ColumnStrategy, RandomStrategy, RowStrategy
+from .game import Animator, ColumnStrategy, RandomStrategy, RowStrategy, BaseStrategy
 from .github_client import ContributionData, GitHubAPIError, GitHubClient
 from .output import resolve_output_provider
+from .output import OutputProvider, WebpDataUrlOutputProvider
 
 # Load environment variables from .env file
 load_dotenv()
@@ -50,6 +50,11 @@ def main(
         "-out",
         "-o",
         help="Generate animated visualization (GIF or WebP)",
+    ),
+    write_dataurl_to: str = typer.Option(
+        None,
+        "--write-dataurl-to",
+        help="Generate WebP as data URL and write to text file",
     ),
     strategy: str = typer.Option(
         "random",
@@ -89,8 +94,15 @@ def main(
     try:
         if not username:
             raise CLIError("Username is required")
-        if not out:
+
+        # Validate mutual exclusivity of output options
+        if out and write_dataurl_to:
+            raise CLIError(
+                "Cannot specify both --output and --write-dataurl-to. Choose one."
+            )
+        if not out and not write_dataurl_to:
             out = f"{username}-gh-space-shooter.gif"
+
         # Load data from file or GitHub
         if raw_input:
             data = _load_data_from_file(raw_input)
@@ -107,7 +119,10 @@ def main(
             _save_data_to_file(data, raw_output)
 
         # Generate output if requested
-        _generate_output(data, out, strategy, fps, watermark, max_frames)
+        if write_dataurl_to or out:
+            output_path = write_dataurl_to or out
+            provider = _resolve_provider(output_path, bool(write_dataurl_to))
+            _generate_output(data, provider, strategy, fps, watermark, max_frames)
 
     except CLIError as e:
         err_console.print(f"[bold red]Error:[/bold red] {e}")
@@ -163,27 +178,23 @@ def _save_data_to_file(data: ContributionData, file_path: str) -> None:
         raise CLIError(f"Failed to save file '{file_path}': {e}")
 
 
-def _generate_output(
-    data: ContributionData,
-    file_path: str,
-    strategy_name: str,
-    fps: int,
-    watermark: bool,
-    max_frames: int | None,
-) -> None:
-    """Generate animation in the format specified by file_path extension."""
+def _resolve_provider(file_path: str, is_dataurl: bool) -> OutputProvider:
+    """
+    Resolve the appropriate output provider based on file path and mode.
+    """
+    try:
+        if is_dataurl:
+            return WebpDataUrlOutputProvider(file_path)
+        else:
+            return resolve_output_provider(file_path)
+    except ValueError as e:
+        raise CLIError(str(e))
 
-    # Warn about GIF FPS limitation
-    if file_path.endswith(".gif") and fps > 50:
-        console.print(
-            f"[yellow]Warning:[/yellow] FPS > 50 may not display correctly in browsers "
-            f"(GIF delay will be {1000 // fps}ms, but browsers clamp delays < 20ms to ~100ms)"
-        )
 
-    ext = Path(file_path).suffix[1:].upper()  # Remove dot and uppercase
-    console.print(f"\n[bold blue]Generating {ext} animation...[/bold blue]")
-
-    # Resolve strategy
+def _setup_animator(strategy_name: str, data: ContributionData, fps: int, watermark: bool) -> Animator:
+    """
+    Set up strategy and animator.
+    """
     if strategy_name == "column":
         strategy: BaseStrategy = ColumnStrategy()
     elif strategy_name == "row":
@@ -195,26 +206,61 @@ def _generate_output(
             f"Unknown strategy '{strategy_name}'. Available: column, row, random"
         )
 
-    # Resolve output provider
+    return Animator(data, strategy, fps=fps, watermark=watermark)
+
+
+def _generate_output(
+    data: ContributionData,
+    provider: OutputProvider,
+    strategy_name: str,
+    fps: int,
+    watermark: bool,
+    max_frames: int | None,
+) -> None:
+    """
+    Generate output using the provided provider.
+
+    Args:
+        data: Contribution data from GitHub
+        provider: Output provider (already resolved with path)
+        strategy_name: Name of the strategy (column, row, random)
+        fps: Frames per second
+        watermark: Whether to add watermark
+        max_frames: Maximum number of frames to generate
+
+    Raises:
+        CLIError: If output generation fails
+    """
+    # Warn about GIF FPS limitation
+    if provider.path.endswith(".gif") and fps > 50:
+        console.print(
+            f"[yellow]Warning:[/yellow] FPS > 50 may not display correctly in browsers "
+            f"(GIF delay will be {1000 // fps}ms, but browsers clamp delays < 20ms to ~100ms)"
+        )
+
+    # Print generation message
+    if isinstance(provider, WebpDataUrlOutputProvider):
+        console.print("\n[bold blue]Generating WebP data URL...[/bold blue]")
+    else:
+        ext = Path(provider.path).suffix[1:].upper()
+        console.print(f"\n[bold blue]Generating {ext} animation...[/bold blue]")
+
+    # Setup strategy and animator
+    animator = _setup_animator(strategy_name, data, fps, watermark)
+
+    # Encode and write
     try:
-        provider = resolve_output_provider(file_path)
-    except ValueError as e:
-        raise CLIError(str(e))
+        encoded = provider.encode(animator.generate_frames(max_frames), 1000 // fps)
+        provider.write(encoded)
 
-    # Generate animation
-    try:
-        animator = Animator(data, strategy, fps=fps, watermark=watermark)
-        encoded = provider.encode(
-            animator.generate_frames(max_frames), 
-            frame_duration=1000 // fps)
-
-        console.print(f"[bold blue]Saving to {file_path}...[/bold blue]")
-        with open(file_path, "wb") as f:
-            f.write(encoded)
-
-        console.print(f"[green]✓[/green] {ext} saved to {file_path}")
+        # Console output based on provider type
+        if isinstance(provider, WebpDataUrlOutputProvider):
+            console.print(f"[green]✓[/green] Data URL written to {provider.path}")
+        else:
+            ext = Path(provider.path).suffix[1:].upper()
+            console.print(f"[green]✓[/green] {ext} saved to {provider.path}")
     except Exception as e:
-        raise CLIError(f"Failed to generate animation: {e}")
+        raise CLIError(f"Failed to generate output: {e}")
 
 
 app = typer.Typer()

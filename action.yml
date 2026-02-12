@@ -1,5 +1,5 @@
 name: 'GitHub Space Shooter'
-description: 'Transform your GitHub contribution graph into an space shooter game GIF'
+description: 'Transform your GitHub contribution graph into a space shooter game GIF or embeddable HTML'
 author: 'zane'
 
 branding:
@@ -26,15 +26,18 @@ inputs:
     description: 'Frames per second for the animation (default: 40)'
     required: false
     default: '40'
+  write-dataurl-to:
+    description: 'Write WebP as HTML <img> data URL to text file (mutually exclusive with output-path)'
+    required: false
   commit-message:
     description: 'Commit message for the GIF update'
     required: false
     default: 'Update space shooter game GIF'
 
 outputs:
-  gif-path:
-    description: 'Path to the generated GIF file'
-    value: ${{ steps.generate.outputs.gif-path }}
+  output-file:
+    description: 'Path to the generated output file (GIF, WebP, or HTML data URL file)'
+    value: ${{ steps.generate.outputs.output-file }}
 
 runs:
   using: 'composite'
@@ -50,22 +53,35 @@ runs:
         python -m pip install --upgrade pip
         pip install gh-space-shooter
 
-    - name: Generate game GIF
+    - name: Generate game
       id: generate
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token }}
       run: |
-        gh-space-shooter ${{ inputs.username }} \
-          --output ${{ inputs.output-path }} \
-          --strategy ${{ inputs.strategy }} \
-          --fps ${{ inputs.fps }}
+        if [ -n "${{ inputs.write-dataurl-to }}" ]; then
+          gh-space-shooter ${{ inputs.username }} \
+            --write-dataurl-to ${{ inputs.write-dataurl-to }} \
+            --strategy ${{ inputs.strategy }} \
+            --fps ${{ inputs.fps }}
+          echo "output-file=${{ inputs.write-dataurl-to }}" >> $GITHUB_OUTPUT
+        else
+          gh-space-shooter ${{ inputs.username }} \
+            --output ${{ inputs.output-path }} \
+            --strategy ${{ inputs.strategy }} \
+            --fps ${{ inputs.fps }}
+          echo "output-file=${{ inputs.output-path }}" >> $GITHUB_OUTPUT
+        fi
 
-    - name: Commit and push GIF
+    - name: Commit and push
       shell: bash
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add ${{ inputs.output-path }}
+        if [ -n "${{ inputs.write-dataurl-to }}" ]; then
+          git add ${{ inputs.write-dataurl-to }}
+        else
+          git add ${{ inputs.output-path }}
+        fi
         git diff --staged --quiet || git commit -m "${{ inputs.commit-message }}"
         git push
